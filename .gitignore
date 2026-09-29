@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+*.tgz
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地调试留下的临时目录（侦察、反编译、跑测试用的）
+.scratch*/
+.dsh-inspect/
+tools/
+
+# 日志与转储
+*.log
+*.tmp
