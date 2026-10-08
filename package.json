@@ -1,9 +1,9 @@
 {
-  "name": "dsh-plugin-session-delete",
-  "version": "1.1.0",
+  "name": "file-cleanup",
+  "version": "1.3.0",
   "private": true,
   "license": "MIT",
-  "description": "右键删除侧边栏会话：连同会话日志、投影缓存与工作区记账一起清干净，不影响其它会话。",
+  "description": "左上角「文件清理」按钮：选「所有工作区」或「DSH_HOME」，二次确认后只删白名单内的垃圾文件，绝不越过所选范围。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -20,8 +20,12 @@
     "lib/index.js",
     "lib/core.js",
     "lib/client.js",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "README.md"
   ],
+  "scripts": {
+    "test": "node test/cleanup.test.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -29,7 +33,7 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-ui-workspace"
+        "@deepseek-ai/dsh-client-ui-layout"
       ]
     }
   },

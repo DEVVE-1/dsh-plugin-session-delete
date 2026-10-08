@@ -1,7 +1,7 @@
-# dsh-plugin-session-delete 的 bundle 补丁层。
+# file-cleanup 的 bundle 补丁层。
 #
-# 只插入一行：Host 半边挂删除接口，浏览器半边（package.json 的 dsh.client）
-# 由模块系统据此自动组装进 web 插件表。
+# 只插入一行：Host 半边挂 /file-cleanup 接口，浏览器半边（package.json 的
+# dsh.client）由模块系统据此自动组装进 web 插件表。
 - insert:
-    - id: session-delete
-      name: 'dsh-plugin-session-delete'
+    - id: file-cleanup
+      name: 'file-cleanup'

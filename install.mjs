@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * 把 dsh-plugin-session-delete 装进指定的 DSH profile 并启用它。
+ * 把 file-cleanup 装进指定的 DSH profile 并启用它。
  *
  * 做三件事，可重复执行：
  *   1. 用运行时自带的 pnpm 把本目录作为 file: 依赖装进 profile；
  *   2. 把包名追加到 profile package.json 的 dsh.profile.bundles（已存在则跳过）；
- *   3. 复查结果并打印后续动作。
+ *   3. 按内容哈希把源码同步进安装目录，再复查。
  *
  * 安装要在 DSH 工作区之外写文件，所以由你（用户）自己执行：
  *   node install.mjs                 # 默认 profile: desktop
@@ -15,7 +15,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -113,21 +113,29 @@ if (result.status !== 0) {
 	ok(`依赖已安装：${installedPath}`);
 }
 
-// ── 2. 追加 bundle 选择（幂等） ────────────────────────────────────────────
+// ── 2. 追加 bundle 选择（幂等）并触发一次 profile 重新组合 ──────────────────
 // 关键：pnpm 刚改过 profile 的 package.json（新增 dependencies 条目），所以
 // 这里必须重新读取，不能拿 pnpm 之前的快照回写，否则会把依赖声明抹掉。
+//
+// 另外：客户端的 bundle 字节是**组合时快照**进内存的（profile 的 hmr.config.root
+// 默认为空，不会监视 node_modules）。所以即便第 3 步把新源码同步进安装目录，
+// 运行中的进程也不会换。这里改 bundle 未变化时也照写一次 profile 清单，
+// 让 profile 重新组合一次，把新的客户端字节重新发布出去。
 const afterInstall = JSON.parse(readFileSync(profileManifestPath, 'utf8'));
 const bundles = Array.isArray(afterInstall?.dsh?.profile?.bundles) ? afterInstall.dsh.profile.bundles : [];
 if (bundles.includes(packageName)) {
-	ok('dsh.profile.bundles 已包含该插件，跳过。');
+	ok('dsh.profile.bundles 已包含该插件。');
 } else {
 	afterInstall.dsh ??= {};
 	afterInstall.dsh.profile ??= {};
 	afterInstall.dsh.profile.bundles = [...bundles, packageName];
+	ok('dsh.profile.bundles 已追加。');
+}
+{
 	const temp = `${profileManifestPath}.tmp`;
 	writeFileSync(temp, `${JSON.stringify(afterInstall, null, 2)}\n`, 'utf8');
 	renameSync(temp, profileManifestPath);
-	ok('dsh.profile.bundles 已追加。');
+	info('已重写 profile 清单，触发一次 live recompose。');
 }
 
 // ── 3. 把包内容同步进安装目录 ──────────────────────────────────────────────
@@ -140,7 +148,10 @@ for (const relative of packageFiles) {
 	const from = join(packagePath, relative);
 	if (!existsSync(from)) continue;
 	const to = join(installedPath, relative);
-	const same = existsSync(to) && createHash('sha256').update(readFileSync(from)).digest('hex') === createHash('sha256').update(readFileSync(to)).digest('hex');
+	const same =
+		existsSync(to) &&
+		createHash('sha256').update(readFileSync(from)).digest('hex') ===
+			createHash('sha256').update(readFileSync(to)).digest('hex');
 	if (same) continue;
 	mkdirSync(dirname(to), { recursive: true });
 	copyFileSync(from, to);
@@ -152,11 +163,11 @@ ok(synced === 0 ? '安装目录与源码逐文件一致。' : `安装目录已�
 // ── 4. 复查 ────────────────────────────────────────────────────────────────
 const finalManifest = JSON.parse(readFileSync(profileManifestPath, 'utf8'));
 if (!finalManifest?.dsh?.profile?.bundles?.includes(packageName)) fail('写入后复查失败：bundles 里没有该插件');
-if (!existsSync(join(installedPath, 'cordis.patch.yml'))) fail(`安装目录里缺少 cordis.patch.yml`);
+if (!existsSync(join(installedPath, 'cordis.patch.yml'))) fail('安装目录里缺少 cordis.patch.yml');
 ok(`复查通过：${packageName} v${JSON.parse(readFileSync(join(installedPath, 'package.json'), 'utf8')).version}`);
 
 console.log('');
 console.log('下一步：');
 console.log('  1. live profile 会即时 recompose；否则重启 DeepSeek Harness。');
 console.log('  2. 刷新一次 GUI 页面（浏览器半边要重新进模块表）。');
-console.log('  3. 左侧边栏右键任意会话 → 「删除会话」。');
+console.log('  3. 左上角「编辑」右边会出现「文件清理」。');
